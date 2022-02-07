@@ -163,7 +163,7 @@ class VideoEmbedderService extends Component
                     $frame->setAttribute("src", "https://www.youtube.com/embed/".$videoId);
                     $frame->setAttribute("frameborder", "0");
                     $frame->setAttribute("allowTransparency", "true");
-                    $frame->setAttribute("style", "border:none;overflow:hidden;width:480;height:360;");
+                    $frame->setAttribute("allowFullscreen", "allowFullscreen");
 
                     //get the src from iframe
                     $src = $frame->getAttribute('src');

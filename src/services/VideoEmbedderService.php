@@ -144,17 +144,85 @@ class VideoEmbedderService extends Component
         return $matches[3];
     }
 
+    // For youtube videos, eliminate the getInfo calls in order to prevent HTTP/429s coming from youtube and crashing the site.
+    public function embedYoutubeVideo($url, $params) {
+        try {
+            $videoId = $this->getYouTubeId($url);
 
+            // check if theree are any parameters passed along
+            if (!empty($params)) {
 
+                // looks like there are, now let's only do this for YouTube and Vimeo
+                // if($this->getInfo($url)->type == 'video' && ($this->isYouTube($url) || $this->isVimeo($url)))
+                if($this->isYouTube($url) || $this->isVimeo($url))
+                {
+                    $dom = new DOMDocument;
+                    $internalErrors = libxml_use_internal_errors(true);
 
-    /**
-     * Take a url and return the embed code
-     *
-     * @param string $url
-     * @return string
-     */
-    public function embed( $url, $params = [] ) : string
-    {
+                    $frame = $dom->createElement("iframe");
+                    $frame->setAttribute("src", "https://www.youtube.com/embed/".$videoId);
+                    $frame->setAttribute("frameborder", "0");
+                    $frame->setAttribute("allowTransparency", "true");
+                    $frame->setAttribute("style", "border:none;overflow:hidden;width:480;height:360;");
+
+                    //get the src from iframe
+                    $src = $frame->getAttribute('src');
+
+                    // check if url has any other parameters to properly add the parameter
+                    if (strpos($src,'?') !== false) {
+                        $src .= "&";
+                    } else {
+                        $src .= "?";
+                    }
+
+                    $parameters = '';
+                    foreach ($params as $k=>$v) {
+                        if ($parameters !== null) {
+                            $parameters .= '&';
+                        }
+                        $parameters .= "{$k}={$v}";
+                    }
+
+                    $src .= $parameters;
+
+                    // set the new src with all the parameters
+                    $frame->setAttribute('src', $src);
+
+                    // replace old iframe html with new one
+                    return htmlspecialchars_decode($dom->saveXML($frame, LIBXML_NOEMPTYTAG));
+                }
+                else
+                {
+                    if (!empty($code)) {
+                        // Not YouTube or Vimeo, just output the code
+                        return $code;
+                    }
+                    else
+                    {
+                        return '';
+                    }
+                }
+            }
+            else
+            {
+                if (!empty($code)) {
+                    // No parameters passed, just output the code
+                    return $code;
+                }
+                else
+                {
+                    return '';
+                }
+            }
+        } catch (InvalidUrlException $e)
+        {
+            // If the URL is invalid (because it's 404ing out or whatever) just return an empty string.
+            return '';
+        }
+    }
+
+    // This is a little bit redundant based on the original plugin, but this should ensure that Vimeo videos still work.
+    public function embedVimeoVideo($url, $params) {
         try {
             $code = $this->getInfo($url)->code;
 
@@ -239,7 +307,20 @@ class VideoEmbedderService extends Component
 
     }
 
+    /**
+     * Take a url and return the embed code
+     *
+     * @param string $url
+     * @return string
+     */
+    public function embed( $url, $params = [] ) : string
+    {
+        if($this->isYouTube($url)) {
+            return $this->embedYoutubeVideo($url, $params);
+        }
 
+        return $this->embedVimeoVideo($url, $params);
+    }
 
     /**
      * Take a url and return the embed url
